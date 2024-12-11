@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Калькулятор ИМТ</title>
+    <!-- Подключение Bootstrap для стилизации -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Подключение библиотеки Chart.js для создания графиков -->
+    <script src="chart.js"></script>
+  </head>
+  <body class="bg-light">
+    <div class="container my-5">
+      <h1 class="text-center mb-4">Калькулятор ИМТ</h1>
+      <!-- Форма для ввода данных роста и веса -->
+      <div class="card p-4 shadow-sm">
+        <form id="bmiForm">
+          <!-- Поле для ввода роста -->
+          <div class="mb-3">
+            <label for="height" class="form-label">Рост (см):</label>
+            <input
+              type="number"
+              class="form-control"
+              id="height"
+              placeholder="Введите свой рост в см"
+              required
+            />
+          </div>
+          <!-- Поле для ввода веса -->
+          <div class="mb-3">
+            <label for="weight" class="form-label">Вес (кг):</label>
+            <input
+              type="number"
+              class="form-control"
+              id="weight"
+              placeholder="Введите свой вес в кг"
+              required
+            />
+          </div>
+          <!-- Кнопка для расчета ИМТ -->
+          <button type="submit" class="btn btn-primary w-100">
+            Рассчитать ИМТ
+          </button>
+        </form>
+      </div>
+
+      <!-- Секция выбора даты для отображения данных -->
+      <div class="card mt-5 p-4 shadow-sm">
+        <h4 class="text-center mb-4">Выберите дату для просмотра данных</h4>
+        <select id="dateSelector" class="form-select mb-3">
+          <option value="">Выбрать дату</option>
+        </select>
+        <div id="selectedDateData" class="text-center"></div>
+      </div>
+
+      <!-- Линейный график для тренда ИМТ -->
+      <div class="card mt-5 p-4 shadow-sm">
+        <h4 class="text-center mb-4">Линейная диаграмма (Тренд ИМТ)</h4>
+        <canvas id="lineChart" width="400" height="200"></canvas>
+      </div>
+
+      <!-- Столбчатая диаграмма для сравнения ИМТ -->
+      <div class="card mt-5 p-4 shadow-sm">
+        <h4 class="text-center mb-4">Гистограмма (сравнение ИМТ)</h4>
+        <canvas id="barChart" width="400" height="200"></canvas>
+      </div>
+
+      <!-- Гистограмма для распределения категорий ИМТ -->
+      <div class="card mt-5 p-4 shadow-sm">
+        <h4 class="text-center mb-4">Гистограмма (распределение ИМТ)</h4>
+        <canvas id="histogramChart" width="400" height="200"></canvas>
+      </div>
+    </div>
+
+    <script>
+      // Инициализация данных для графиков
+      const labels = []; // Массив меток по оси X (даты)
+      const bmiData = []; // Массив значений ИМТ
+      const histogramData = [0, 0, 0, 0]; // Категории ИМТ: [Недостаточный, Нормальный, Избыточный, Ожирение]
+
+      // Функция для сохранения данных в LocalStorage
+      function saveData() {
+        localStorage.setItem("labels", JSON.stringify(labels)); // Сохраняем метки (даты)
+        localStorage.setItem("bmiData", JSON.stringify(bmiData)); // Сохраняем значения ИМТ
+        localStorage.setItem("histogramData", JSON.stringify(histogramData)); // Сохраняем распределение категорий ИМТ
+      }
+
+      // Функция для загрузки данных из LocalStorage
+      function loadData() {
+        const savedLabels = localStorage.getItem("labels");
+        const savedBmiData = localStorage.getItem("bmiData");
+        const savedHistogramData = localStorage.getItem("histogramData");
+
+        // Загружаем данные, если они сохранены
+        if (savedLabels) labels.push(...JSON.parse(savedLabels));
+        if (savedBmiData) bmiData.push(...JSON.parse(savedBmiData));
+        if (savedHistogramData)
+          histogramData.splice(
+            0,
+            histogramData.length,
+            ...JSON.parse(savedHistogramData)
+          );
+      }
+
+      // Загрузка данных при загрузке страницы
+      loadData();
+
+      // Функция для заполнения выпадающего списка дат
+      function populateDateSelector() {
+        const dateSelector = document.getElementById("dateSelector");
+        dateSelector.innerHTML = '<option value="">Выбрать дату</option>'; // Сброс списка
+
+        // Добавляем уникальные даты в выпадающий список
+        const uniqueDates = [...new Set(labels)];
+        uniqueDates.forEach((date) => {
+          const option = document.createElement("option");
+          option.value = date;
+          option.textContent = date;
+          dateSelector.appendChild(option);
+        });
+      }
+
+      // Создание линейного графика для тренда ИМТ
+      const lineCtx = document.getElementById("lineChart").getContext("2d");
+      const lineChart = new Chart(lineCtx, {
+        type: "line",
+        data: {
+          labels: labels, // Метки оси X
+          datasets: [
+            {
+              label: "Индекс массы тела с течением времени",
+              data: bmiData, // Значения ИМТ по оси Y
+              borderColor: "rgba(75, 192, 192, 1)", // Цвет линии
+              backgroundColor: "rgba(75, 192, 192, 0.2)", // Заливка под линией
+              borderWidth: 2, // Толщина линии
+              tension: 0.4, // Плавность линии
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Дата", // Подпись оси X
+              },
+            },
+            y: {
+              title: {
+                display: true,
+                text: "ИМТ", // Подпись оси Y
+              },
+            },
+          },
+        },
+      });
+
+      // Создание столбчатой диаграммы для сравнения ИМТ
+      const barCtx = document.getElementById("barChart").getContext("2d");
+      const barChart = new Chart(barCtx, {
+        type: "bar",
+        data: {
+          labels: labels, // Метки оси X
+          datasets: [
+            {
+              label: "Значения ИМТ",
+              data: bmiData, // Значения ИМТ
+              backgroundColor: "rgba(153, 102, 255, 0.2)", // Цвет столбцов
+              borderColor: "rgba(153, 102, 255, 1)", // Цвет границ столбцов
+              borderWidth: 2, // Толщина границ столбцов
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Дата",
+              },
+            },
+            y: {
+              title: {
+                display: true,
+                text: "ИМТ",
+              },
+            },
+          },
+        },
+      });
+
+      // Создание гистограммы для распределения категорий ИМТ
+      const histogramCtx = document
+        .getElementById("histogramChart")
+        .getContext("2d");
+      const histogramChart = new Chart(histogramCtx, {
+        type: "bar",
+        data: {
+          labels: [
+            "Недостаточный вес",
+            "Нормальный вес",
+            "Избыточный вес",
+            "Ожирение",
+          ],
+          datasets: [
+            {
+              label: "Распределение ИМТ",
+              data: histogramData, // Данные по категориям
+              backgroundColor: [
+                "rgba(54, 162, 235, 0.2)",
+                "rgba(75, 192, 192, 0.2)",
+                "rgba(255, 206, 86, 0.2)",
+                "rgba(255, 99, 132, 0.2)",
+              ],
+              borderColor: [
+                "rgba(54, 162, 235, 1)",
+                "rgba(75, 192, 192, 1)",
+                "rgba(255, 206, 86, 1)",
+                "rgba(255, 99, 132, 1)",
+              ],
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true, // Начало оси Y с нуля
+            },
+          },
+        },
+      });
+
+      // Обработчик формы для расчета ИМТ
+      document
+        .getElementById("bmiForm")
+        .addEventListener("submit", function (e) {
+          e.preventDefault(); // Предотвращаем стандартное поведение формы
+
+          const height = parseFloat(document.getElementById("height").value);
+          const weight = parseFloat(document.getElementById("weight").value);
+
+          // Проверяем корректность введённых данных
+          if (height > 0 && weight > 0) {
+            const heightInMeters = height / 100; // Преобразуем рост в метры
+            const bmi = (weight / heightInMeters ** 2).toFixed(2); // Рассчитываем ИМТ
+
+            const currentDate = new Date().toLocaleDateString(); // Текущая дата
+            labels.push(currentDate); // Добавляем дату
+            bmiData.push(bmi); // Добавляем ИМТ
+
+            // Обновляем распределение категорий ИМТ
+            if (bmi < 18.5) histogramData[0]++;
+            else if (bmi >= 18.5 && bmi < 25) histogramData[1]++;
+            else if (bmi >= 25 && bmi < 30) histogramData[2]++;
+            else histogramData[3]++;
+
+            saveData(); // Сохраняем данные в LocalStorage
+
+            // Обновляем графики
+            lineChart.update();
+            barChart.update();
+            histogramChart.update();
+
+            // Обновляем выпадающий список дат
+            populateDateSelector();
+            document.getElementById("bmiForm").reset(); // Сбрасываем форму
+          } else {
+            alert("Введите корректные данные!");
+          }
+        });
+
+      // Обработчик выбора даты
+      document
+        .getElementById("dateSelector")
+        .addEventListener("change", function () {
+          const selectedDate = this.value;
+
+          if (selectedDate) {
+            // Фильтруем данные по выбранной дате
+            const filteredLabels = labels.filter(
+              (label) => label === selectedDate
+            );
+            const filteredBmiData = labels
+              .map((label, index) =>
+                label === selectedDate ? bmiData[index] : null
+              )
+              .filter((value) => value !== null);
+
+            // Обновляем графики с фильтрованными данными
+            lineChart.data.labels = filteredLabels;
+            lineChart.data.datasets[0].data = filteredBmiData;
+
+            barChart.data.labels = filteredLabels;
+            barChart.data.datasets[0].data = filteredBmiData;
+
+            lineChart.update();
+            barChart.update();
+
+            // Обновляем текст с выбранной датой
+            const selectedDateData =
+              document.getElementById("selectedDateData");
+            selectedDateData.textContent = `Выбранная дата: ${selectedDate}`;
+            selectedDateData.classList.add("fw-bold", "text-primary");
+          } else {
+            // Если дата не выбрана, показываем все данные
+            lineChart.data.labels = labels;
+            lineChart.data.datasets[0].data = bmiData;
+
+            barChart.data.labels = labels;
+            barChart.data.datasets[0].data = bmiData;
+
+            lineChart.update();
+            barChart.update();
+
+            document.getElementById("selectedDateData").textContent =
+              "Показаны все данные";
+          }
+        });
+
+      // Инициализация выпадающего списка дат
+      populateDateSelector();
+    </script>
+    <!-- Подключение Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
